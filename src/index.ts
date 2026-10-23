@@ -70,9 +70,6 @@ export interface WebhookPayload {
 
 export default {
   async fetch(request: Request, env: Env, ctx: ExecutionContext): Promise<Response> {
-    if (request.method === "GET" && new URL(request.url).pathname === "/_diag") {
-      return json(await secretFingerprints(env));
-    }
     if (request.method !== "POST") {
       return new Response("grokbot-discord is running. Point Discord's Interactions Endpoint URL here.", {
         status: request.method === "GET" ? 200 : 405,
@@ -195,30 +192,8 @@ export function webhookAuthHeaders(env: Env): Record<string, string> {
   return { [header]: scheme ? `${scheme} ${env.GROKBOT_WEBHOOK_KEY}` : env.GROKBOT_WEBHOOK_KEY };
 }
 
-/**
- * Non-reversible fingerprints (first 12 hex of SHA-256) and lengths of the webhook settings,
- * so the deployed values can be compared with the box's without ever exposing them.
- */
-export async function secretFingerprints(env: Env): Promise<Record<string, string | number>> {
-  const auth = Object.values(webhookAuthHeaders(env))[0];
-  return {
-    key_len: (env.GROKBOT_WEBHOOK_KEY ?? "").length,
-    key_sha12: await sha12(env.GROKBOT_WEBHOOK_KEY ?? ""),
-    auth_header: Object.keys(webhookAuthHeaders(env))[0],
-    auth_sha12: await sha12(auth),
-    url_len: (env.GROKBOT_WEBHOOK_URL ?? "").length,
-    url_sha12: await sha12(env.GROKBOT_WEBHOOK_URL ?? ""),
-  };
-}
-
-async function sha12(value: string): Promise<string> {
-  const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("").slice(0, 12);
-}
-
 export async function forward(payload: WebhookPayload, env: Env): Promise<void> {
   const tag = `[forward ${payload.interaction_id}]`;
-  console.log(`${tag} sending ${JSON.stringify(await secretFingerprints(env))}`);
   let error: string | null = null;
   try {
     const res = await fetch(env.GROKBOT_WEBHOOK_URL, {
