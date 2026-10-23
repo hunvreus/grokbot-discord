@@ -136,11 +136,9 @@ Type `/ask prompt: hello` in an allowed channel. You should see "thinking" and t
 | `DISCORD_PUBLIC_KEY` | var | yes | | 64 hex characters | The app's Ed25519 public key. |
 | `ALLOWED_USER_IDS` | var | yes | | `123456789012345678,234567890123456789` | Discord user ids allowed to use the bot. Empty means nobody. |
 | `GROKBOT_WEBHOOK_URL` | var | yes | | `https://api2.cursor.sh/automations/webhook/<id>` | The routine's webhook URL. Must be `https://`. |
-| `GROKBOT_WEBHOOK_KEY` | secret | yes | | | The routine's webhook key. |
+| `GROKBOT_WEBHOOK_KEY` | secret | yes | | | The routine's webhook key. The Worker sends it as `Authorization: Bearer <key>`. |
 | `ALLOWED_GUILD_IDS` | var | no | any server | `345678901234567890` | Comma-separated server ids. |
 | `ALLOWED_CHANNEL_IDS` | var | no | any channel | `456789012345678901` | Comma-separated channel ids. |
-| `GROKBOT_WEBHOOK_AUTH_HEADER` | var | no | `Authorization` | `X-Api-Key` | The header that carries the key. |
-| `GROKBOT_WEBHOOK_AUTH_SCHEME` | var | no | `Bearer` | `""` | Text before the key. Set it to `""` to send the key alone. |
 | `DISCORD_BOT_TOKEN` | secret | no | | | Bot token. Only used to post answers that arrive more than 15 minutes after the command. Needs the `bot` scope and Send Messages in the channel. |
 | `REPLY_TTL_MINUTES` | var | no | `60` | `180` | How long a reply URL works, in minutes (1 to 10080). After 15 minutes answers need `DISCORD_BOT_TOKEN`. |
 | `DENIED_MESSAGE` | var | no | `You aren't allowed to use this bot.` | `Sorry, this bot is private.` | First line of the reply a user not in `ALLOWED_USER_IDS` gets. A second line with their user id and how to allow it is always added. Only they see it. |
@@ -262,7 +260,7 @@ Messages the Worker can show in Discord, and what to do:
 | `This bot isn't allowed in this channel.` followed by `The channel ID is <id>` | Add the id to `ALLOWED_CHANNEL_IDS`, or empty it. |
 | `This bot only handles slash commands` or `... is not a slash command` | Only chat slash commands are supported. Buttons, modals and context-menu commands are not. |
 | `/<command> needs a prompt.` | The command had no options. Register it with `npm run register`, which adds a required `prompt`. |
-| `Could not reach the bot. The webhook rejected the key (HTTP 401)` or `(HTTP 403)` | `GROKBOT_WEBHOOK_KEY` is wrong, or the header or scheme don't match what the webhook expects. Copy the key from the routine again and paste it yourself with `npx wrangler secret put GROKBOT_WEBHOOK_KEY` or in the dashboard. |
+| `Could not reach the bot. The webhook rejected the key (HTTP 401)` or `(HTTP 403)` | `GROKBOT_WEBHOOK_KEY` is wrong. Copy the key from the routine again and paste it yourself with `npx wrangler secret put GROKBOT_WEBHOOK_KEY` or in the dashboard. |
 | `The webhook URL was not found (HTTP 404)` | `GROKBOT_WEBHOOK_URL` is wrong, or the routine or its trigger was deleted. |
 | `The webhook is rate limiting requests (HTTP 429)` | Wait a minute and try again. |
 | `The webhook had a server error (HTTP 5xx)` | A problem on the Grok Bot side. Try again later. |

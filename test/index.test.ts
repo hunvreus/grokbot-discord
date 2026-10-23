@@ -261,12 +261,11 @@ describe("interactions", () => {
     expect(body.reply.instructions).toContain('"progress": true');
   });
 
-  it("supports a custom auth header with a raw value", async () => {
+  it("sends the key as a Bearer token in the Authorization header", async () => {
     const fetchMock = webhookReturning(200);
-    await run(command("111"), env({ GROKBOT_WEBHOOK_AUTH_HEADER: "X-Sender-Key", GROKBOT_WEBHOOK_AUTH_SCHEME: "" }));
+    await run(command("111"), env({ GROKBOT_WEBHOOK_KEY: "  secret-key  " }));
     const headers = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].headers as Record<string, string>;
-    expect(headers["X-Sender-Key"]).toBe("secret-key");
-    expect(headers.Authorization).toBeUndefined();
+    expect(headers.Authorization).toBe("Bearer secret-key");
   });
 
   it("flattens subcommands into the command path", async () => {
@@ -282,7 +281,7 @@ describe("interactions", () => {
 describe("webhook failures", () => {
   it.each([
     [401, "rejected the key", "GROKBOT_WEBHOOK_KEY"],
-    [403, "rejected the key", "GROKBOT_WEBHOOK_AUTH_SCHEME"],
+    [403, "rejected the key", "GROKBOT_WEBHOOK_KEY"],
     [404, "URL was not found", "GROKBOT_WEBHOOK_URL"],
     [429, "rate limiting", "HTTP 429"],
     [502, "server error", "HTTP 502"],
