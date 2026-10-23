@@ -1,6 +1,6 @@
 {
   "name": "grokbot-discord",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "description": "Cloudflare Worker that relays Discord slash commands to a Grok Bot routine webhook",
   "license": "MIT",
   "repository": {

@@ -5,7 +5,8 @@
   "compatibility_date": "2026-05-01",
   "observability": { "enabled": true },
   // Settings live on the Worker, not in this file. Set them in the Cloudflare dashboard
-  // (Settings > Variables and Secrets): GROKBOT_WEBHOOK_KEY as a Secret, everything else as Text.
+  // (Settings > Variables and Secrets): GROKBOT_WEBHOOK_KEY and DISCORD_BOT_TOKEN as Secrets,
+  // everything else as Text.
   // keep_vars stops `wrangler deploy` from deleting the Text variables set there.
   // Secrets are always kept on deploy.
   // A "vars" block here also works, but its values replace the dashboard ones on every deploy.

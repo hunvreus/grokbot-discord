@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import worker, { type Env, configProblems, describeWebhookFailure, verifyDiscordRequest } from "../src/index";
+import worker, { type Env, configProblems, describeWebhookFailure, verifyDiscordRequest } from "../src/relay";
 
 let keys: CryptoKeyPair;
 let publicKeyHex: string;
@@ -139,6 +139,17 @@ describe("config checks", () => {
     expect(configProblems(env({ GROKBOT_WEBHOOK_URL: "http://example.test" }))[0].name).toBe("GROKBOT_WEBHOOK_URL");
   });
 
+  it("validates REPLY_TTL_MINUTES and uses it for reply.expires_at", async () => {
+    for (const bad of ["0", "abc", "1.5", "99999"]) {
+      expect(configProblems(env({ REPLY_TTL_MINUTES: bad })).map((p) => p.name)).toEqual(["REPLY_TTL_MINUTES"]);
+    }
+    expect(configProblems(env({ REPLY_TTL_MINUTES: "" }))).toEqual([]);
+    const fetchMock = webhookReturning(200);
+    await run(command("111"), env({ REPLY_TTL_MINUTES: "180" }));
+    const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
+    expect(Date.parse(body.reply.expires_at) - Date.parse(body.received_at)).toBe(180 * 60_000);
+  });
+
   it("tells the Discord user which variable is missing", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
@@ -230,17 +241,24 @@ describe("interactions", () => {
       source: "discord",
       application_id: "app-1",
       interaction_id: "int-1",
-      interaction_token: "tok-abc",
       guild_id: "g-1",
       channel_id: "c-1",
       user: { id: "222", username: "ronan", global_name: "Ronan" },
       command: "ask",
       options: { prompt: "check #200" },
       text: "check #200",
-      followup_url: "https://discord.com/api/v10/webhooks/app-1/tok-abc",
-      edit_original_url: ORIGINAL,
+      reply: { method: "POST", body: { content: "<your answer in Markdown, any length>" } },
     });
     expect(Date.parse(body.received_at)).not.toBeNaN();
+    // One way to reply: the interaction token is only inside the encrypted reply URL.
+    expect(body).not.toHaveProperty("interaction_token");
+    expect(body).not.toHaveProperty("edit_original_url");
+    expect(body).not.toHaveProperty("followup_url");
+    expect(JSON.stringify(body)).not.toContain("tok-abc");
+    expect(body.reply.url).toMatch(/^https:\/\/worker\.test\/reply\/[A-Za-z0-9_-]+$/);
+    expect(Date.parse(body.reply.expires_at) - Date.parse(body.received_at)).toBe(60 * 60_000);
+    expect(body.reply.instructions).toContain("reply.url");
+    expect(body.reply.instructions).toContain('"progress": true');
   });
 
   it("supports a custom auth header with a raw value", async () => {

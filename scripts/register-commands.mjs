@@ -3,7 +3,7 @@
 //
 // Required env:
 //   DISCORD_APPLICATION_ID  General Information > Application ID
-//   DISCORD_BOT_TOKEN       Bot > Reset Token (only used here, never by the Worker)
+//   DISCORD_BOT_TOKEN       Bot > Reset Token (only used here; the Worker uses it only if you also set it there)
 // Optional env:
 //   DISCORD_GUILD_ID        register in one server (appears instantly) instead of globally (up to an hour)
 //   COMMAND_NAME            default "ask"; 1-32 characters of a-z, 0-9, - or _
