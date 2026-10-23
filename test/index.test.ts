@@ -216,4 +216,13 @@ describe("interactions", () => {
     expect(body.options).toEqual({ number: 200 });
     expect(body.text).toBe("number: 200");
   });
+
+  it("serves non-reversible fingerprints on GET /_diag", async () => {
+    const res = await worker.fetch(new Request("https://worker.test/_diag"), env(), makeCtx().ctx);
+    const body = await res.json();
+    expect(body.key_len).toBe(10);
+    expect(body.auth_header).toBe("Authorization");
+    expect(body.key_sha12).toMatch(/^[0-9a-f]{12}$/);
+    expect(JSON.stringify(body)).not.toContain("secret-key");
+  });
 });
