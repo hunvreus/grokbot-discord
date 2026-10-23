@@ -193,6 +193,7 @@ export function webhookAuthHeaders(env: Env): Record<string, string> {
 }
 
 export async function forward(payload: WebhookPayload, env: Env): Promise<void> {
+  const tag = `[forward ${payload.interaction_id}]`;
   let error: string | null = null;
   try {
     const res = await fetch(env.GROKBOT_WEBHOOK_URL, {
@@ -200,18 +201,33 @@ export async function forward(payload: WebhookPayload, env: Env): Promise<void> 
       headers: { "Content-Type": "application/json", ...webhookAuthHeaders(env) },
       body: JSON.stringify(payload),
     });
-    if (!res.ok) error = `the webhook returned HTTP ${res.status}`;
-  } catch {
+    const text = await res.text().catch(() => "");
+    // Never log the key or the request; only the webhook's answer.
+    console.log(`${tag} webhook status=${res.status} body=${JSON.stringify(text.slice(0, 300))}`);
+    if (!res.ok) error = `the webhook returned HTTP ${res.status}${text ? ` (${text.slice(0, 200)})` : ""}`;
+  } catch (e) {
+    console.log(`${tag} webhook fetch threw: ${e instanceof Error ? e.message : String(e)}`);
     error = "the webhook could not be reached";
   }
-  if (error === null) return;
 
-  // Replace Discord's "thinking..." state so the user isn't left waiting.
-  await fetch(payload.edit_original_url, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ content: `Could not reach the bot: ${error}.` }),
-  }).catch(() => {});
+  // Replace Discord's "thinking..." state either way, so the user can see where things stand.
+  // The bot's own reply later edits the same message.
+  const content = error === null ? "Sent to Grug." : `Could not reach the bot: ${error}.`;
+  await patchOriginal(payload.edit_original_url, content, tag);
+}
+
+async function patchOriginal(url: string, content: string, tag: string): Promise<void> {
+  try {
+    const res = await fetch(url, {
+      method: "PATCH",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content: content.slice(0, 2000) }),
+    });
+    const text = res.ok ? "" : await res.text().catch(() => "");
+    console.log(`${tag} discord patch status=${res.status}${text ? ` body=${JSON.stringify(text.slice(0, 300))}` : ""}`);
+  } catch (e) {
+    console.log(`${tag} discord patch threw: ${e instanceof Error ? e.message : String(e)}`);
+  }
 }
 
 function parseList(value: string | undefined): string[] {

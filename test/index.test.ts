@@ -115,7 +115,7 @@ describe("interactions", () => {
     expect(await res.json()).toEqual({ type: 5 });
     await Promise.all(pending);
 
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+    expect(fetchMock).toHaveBeenCalledTimes(2);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://example.test/hook");
     expect(init.method).toBe("POST");
@@ -161,6 +161,45 @@ describe("interactions", () => {
     expect(url).toBe("https://discord.com/api/v10/webhooks/app-1/tok-abc/messages/@original");
     expect(init.method).toBe("PATCH");
     expect(JSON.parse(init.body as string).content).toContain("HTTP 500");
+  });
+
+  it("patches 'Sent to Grug.' after a successful forward", async () => {
+    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
+    vi.stubGlobal("fetch", fetchMock);
+    const { ctx, pending } = makeCtx();
+    await worker.fetch(await signedRequest(command("111")), env(), ctx);
+    await Promise.all(pending);
+    const [url, init] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+    expect(url).toBe("https://discord.com/api/v10/webhooks/app-1/tok-abc/messages/@original");
+    expect(init.method).toBe("PATCH");
+    expect(JSON.parse(init.body as string).content).toBe("Sent to Grug.");
+  });
+
+  it("patches an error when the webhook is unreachable", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("example.test")) throw new Error("boom");
+      return new Response("", { status: 200 });
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    const { ctx, pending } = makeCtx();
+    await worker.fetch(await signedRequest(command("111")), env(), ctx);
+    await Promise.all(pending);
+    const init = (fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1];
+    expect(JSON.parse(init.body as string).content).toContain("could not be reached");
+  });
+
+  it("logs the webhook status but never the key", async () => {
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => { logs.push(a.join(" ")); });
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(url.includes("example.test") ? "nope" : "", { status: url.includes("example.test") ? 403 : 200 })));
+    const { ctx, pending } = makeCtx();
+    await worker.fetch(await signedRequest(command("111")), env(), ctx);
+    await Promise.all(pending);
+    spy.mockRestore();
+    const all = logs.join("\n");
+    expect(all).toContain("webhook status=403");
+    expect(all).toContain("nope");
+    expect(all).not.toContain("secret-key");
   });
 
   it("flattens subcommands into the command path", async () => {
