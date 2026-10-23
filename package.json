@@ -1,16 +1,34 @@
 {
   "name": "grokbot-discord",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Cloudflare Worker that relays Discord slash commands to a Grok Bot routine webhook",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hunvreus/grokbot-discord.git"
+  },
+  "homepage": "https://github.com/hunvreus/grokbot-discord#readme",
+  "bugs": {
+    "url": "https://github.com/hunvreus/grokbot-discord/issues"
+  },
+  "keywords": [
+    "discord",
+    "cloudflare-workers",
+    "grok-bot",
+    "slash-commands",
+    "webhook"
+  ],
   "private": true,
   "type": "module",
+  "engines": {
+    "node": ">=20"
+  },
   "scripts": {
     "dev": "wrangler dev",
     "deploy": "wrangler deploy",
-    "register": "node scripts/register-commands.mjs",
     "test": "vitest run",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "register": "node scripts/register-commands.mjs"
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260702.1",

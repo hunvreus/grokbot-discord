@@ -1,4 +1,11 @@
-DISCORD_PUBLIC_KEY=
-ALLOWED_USER_IDS=
-GROKBOT_WEBHOOK_URL=
-GROKBOT_WEBHOOK_KEY=
+# Copy to .dev.vars for `npm run dev`. Never commit .dev.vars.
+# Required
+DISCORD_PUBLIC_KEY=        # Developer Portal > General Information > Public Key (64 hex characters)
+ALLOWED_USER_IDS=          # comma-separated Discord user ids, e.g. 123456789012345678
+GROKBOT_WEBHOOK_URL=       # the routine's webhook URL
+GROKBOT_WEBHOOK_KEY=       # the routine's webhook key
+# Optional
+# ALLOWED_GUILD_IDS=
+# ALLOWED_CHANNEL_IDS=
+# GROKBOT_WEBHOOK_AUTH_HEADER=Authorization
+# GROKBOT_WEBHOOK_AUTH_SCHEME=Bearer

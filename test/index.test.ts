@@ -1,5 +1,5 @@
 import { afterEach, beforeAll, describe, expect, it, vi } from "vitest";
-import worker, { type Env, verifyDiscordRequest } from "../src/index";
+import worker, { type Env, configProblems, describeWebhookFailure, verifyDiscordRequest } from "../src/index";
 
 let keys: CryptoKeyPair;
 let publicKeyHex: string;
@@ -53,6 +53,27 @@ const command = (userId: string, extra: Record<string, unknown> = {}) => ({
   ...extra,
 });
 
+
+const ORIGINAL = "https://discord.com/api/v10/webhooks/app-1/tok-abc/messages/@original";
+
+async function run(payload: unknown, e: Env = env()) {
+  const { ctx, pending } = makeCtx();
+  const res = await worker.fetch(await signedRequest(payload), e, ctx);
+  await Promise.all(pending);
+  return res;
+}
+
+function webhookReturning(status: number, body = "") {
+  const fetchMock = vi.fn(async (url: string) => (url.includes("example.test") ? new Response(body, { status }) : new Response("{}")));
+  vi.stubGlobal("fetch", fetchMock);
+  return fetchMock;
+}
+
+function lastEdit(fetchMock: ReturnType<typeof vi.fn>) {
+  const [url, init] = fetchMock.mock.calls.at(-1) as unknown as [string, RequestInit];
+  return { url, method: init.method, content: JSON.parse(init.body as string).content as string };
+}
+
 describe("signature verification", () => {
   it("accepts a valid signature", async () => {
     const body = '{"type":1}';
@@ -74,48 +95,120 @@ describe("signature verification", () => {
     const res = await worker.fetch(await signedRequest({ type: 1 }, { badSig: true }), env(), makeCtx().ctx);
     expect(res.status).toBe(401);
   });
+
+  it("returns 500 naming DISCORD_PUBLIC_KEY when it is missing or malformed", async () => {
+    for (const key of ["", "abc"]) {
+      const res = await worker.fetch(await signedRequest({ type: 1 }), env({ DISCORD_PUBLIC_KEY: key }), makeCtx().ctx);
+      expect(res.status).toBe(500);
+      expect(await res.text()).toContain("DISCORD_PUBLIC_KEY");
+    }
+  });
+});
+
+describe("status page", () => {
+  it("lists required settings as ok when configured", async () => {
+    const res = await worker.fetch(new Request("https://worker.test/"), env(), makeCtx().ctx);
+    expect(res.status).toBe(200);
+    const text = await res.text();
+    expect(text).toContain("running and configured");
+    expect(text).toMatch(/GROKBOT_WEBHOOK_KEY\s+ok/);
+    expect(text).toMatch(/ALLOWED_GUILD_IDS\s+not set/);
+    expect(text).not.toContain("secret-key");
+    expect(text).not.toContain("example.test");
+  });
+
+  it("names missing settings without values", async () => {
+    const res = await worker.fetch(new Request("https://worker.test/anything"), env({ GROKBOT_WEBHOOK_KEY: "", GROKBOT_WEBHOOK_URL: "not a url" }), makeCtx().ctx);
+    expect(res.status).toBe(503);
+    const text = await res.text();
+    expect(text).toMatch(/GROKBOT_WEBHOOK_KEY\s+is missing/);
+    expect(text).toMatch(/GROKBOT_WEBHOOK_URL\s+is not a valid https:\/\/ URL/);
+    expect(text).not.toContain("not a url");
+  });
+
+  it("returns 405 for other methods", async () => {
+    const res = await worker.fetch(new Request("https://worker.test/", { method: "PUT" }), env(), makeCtx().ctx);
+    expect(res.status).toBe(405);
+  });
+});
+
+describe("config checks", () => {
+  it("reports every required setting", () => {
+    expect(configProblems({}).map((p) => p.name)).toEqual(["DISCORD_PUBLIC_KEY", "ALLOWED_USER_IDS", "GROKBOT_WEBHOOK_URL", "GROKBOT_WEBHOOK_KEY"]);
+    expect(configProblems(env())).toEqual([]);
+    expect(configProblems(env({ GROKBOT_WEBHOOK_URL: "http://example.test" }))[0].name).toBe("GROKBOT_WEBHOOK_URL");
+  });
+
+  it("tells the Discord user which variable is missing", async () => {
+    const fetchMock = vi.fn();
+    vi.stubGlobal("fetch", fetchMock);
+    const res = await run(command("111"), env({ GROKBOT_WEBHOOK_KEY: " " }));
+    const body = await res.json();
+    expect(body.type).toBe(4);
+    expect(body.data.flags).toBe(64);
+    expect(body.data.content).toContain("GROKBOT_WEBHOOK_KEY is missing");
+    expect(body.data.content).toContain("#configuration");
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("still answers PING when the webhook settings are missing", async () => {
+    const res = await run({ type: 1 }, env({ GROKBOT_WEBHOOK_URL: "", GROKBOT_WEBHOOK_KEY: "" }));
+    expect(await res.json()).toEqual({ type: 1 });
+  });
+
+  it("reports an empty ALLOWED_USER_IDS as a config problem", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const body = await (await run(command("111"), env({ ALLOWED_USER_IDS: " " }))).json();
+    expect(body.data.content).toContain("ALLOWED_USER_IDS is empty");
+  });
 });
 
 describe("interactions", () => {
   it("answers PING with PONG", async () => {
-    const res = await worker.fetch(await signedRequest({ type: 1 }), env(), makeCtx().ctx);
-    expect(res.status).toBe(200);
-    expect(await res.json()).toEqual({ type: 1 });
+    expect(await (await run({ type: 1 })).json()).toEqual({ type: 1 });
   });
 
-  it("rejects a user not on the allowlist and never forwards", async () => {
+  it("replies ephemerally to unsupported interaction and command types", async () => {
+    const r1 = await (await run({ ...command("111"), type: 3 })).json();
+    expect(r1.data.flags).toBe(64);
+    expect(r1.data.content).toContain("only handles slash commands");
+    const r2 = await (await run(command("111", { data: { name: "Ask about this", type: 3 } }))).json();
+    expect(r2.data.content).toContain("not a slash command");
+  });
+
+  it("asks for a prompt when the command has no options", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const body = await (await run(command("111", { data: { name: "ask", type: 1 } }))).json();
+    expect(body.data.content).toContain("needs a prompt");
+  });
+
+  it("rejects a user not on the allowlist, names the id and never forwards", async () => {
     const fetchMock = vi.fn();
     vi.stubGlobal("fetch", fetchMock);
-    const { ctx, pending } = makeCtx();
-    const res = await worker.fetch(await signedRequest(command("999")), env(), ctx);
-    expect(await res.json()).toEqual({ type: 4, data: { content: "Not allowed.", flags: 64 } });
-    expect(pending).toHaveLength(0);
+    const body = await (await run(command("999"))).json();
+    expect(body.type).toBe(4);
+    expect(body.data.flags).toBe(64);
+    expect(body.data.content).toContain("add user id 999 to ALLOWED_USER_IDS");
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("fails closed when ALLOWED_USER_IDS is empty", async () => {
+  it("enforces guild and channel allowlists and names the ids", async () => {
     vi.stubGlobal("fetch", vi.fn());
-    const res = await worker.fetch(await signedRequest(command("111")), env({ ALLOWED_USER_IDS: " " }), makeCtx().ctx);
-    expect((await res.json()).data.content).toBe("Not allowed.");
-  });
-
-  it("enforces guild and channel allowlists when set", async () => {
-    vi.stubGlobal("fetch", vi.fn());
-    const r1 = await worker.fetch(await signedRequest(command("111")), env({ ALLOWED_GUILD_IDS: "g-2" }), makeCtx().ctx);
-    expect((await r1.json()).type).toBe(4);
-    const r2 = await worker.fetch(await signedRequest(command("111")), env({ ALLOWED_CHANNEL_IDS: "c-9" }), makeCtx().ctx);
-    expect((await r2.json()).type).toBe(4);
+    const r1 = await (await run(command("111"), env({ ALLOWED_GUILD_IDS: "g-2" }))).json();
+    expect(r1.data.content).toContain("add server id g-1 to ALLOWED_GUILD_IDS");
+    const r2 = await (await run(command("111"), env({ ALLOWED_CHANNEL_IDS: "c-9" }))).json();
+    expect(r2.data.content).toContain("add channel id c-1 to ALLOWED_CHANNEL_IDS");
+    const r3 = await (await run(command("111", { guild_id: undefined }), env({ ALLOWED_GUILD_IDS: "g-2" }))).json();
+    expect(r3.data.content).toContain("direct messages");
   });
 
   it("defers and forwards an allowed command with the right body and auth header", async () => {
-    const fetchMock = vi.fn(async () => new Response("ok", { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    const { ctx, pending } = makeCtx();
-    const res = await worker.fetch(await signedRequest(command("222")), env(), ctx);
+    const fetchMock = webhookReturning(200, "{}");
+    const res = await run(command("222"));
     expect(await res.json()).toEqual({ type: 5 });
-    await Promise.all(pending);
 
-    expect(fetchMock).toHaveBeenCalledTimes(2);
+    // Success: no edit, Discord keeps "thinking" until the bot replies.
+    expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
     expect(url).toBe("https://example.test/hook");
     expect(init.method).toBe("POST");
@@ -133,87 +226,73 @@ describe("interactions", () => {
       options: { prompt: "check #200" },
       text: "check #200",
       followup_url: "https://discord.com/api/v10/webhooks/app-1/tok-abc",
-      edit_original_url: "https://discord.com/api/v10/webhooks/app-1/tok-abc/messages/@original",
+      edit_original_url: ORIGINAL,
     });
     expect(Date.parse(body.received_at)).not.toBeNaN();
   });
 
   it("supports a custom auth header with a raw value", async () => {
-    const fetchMock = vi.fn(async () => new Response("ok"));
-    vi.stubGlobal("fetch", fetchMock);
-    const { ctx, pending } = makeCtx();
-    const e = env({ GROKBOT_WEBHOOK_AUTH_HEADER: "X-Sender-Key", GROKBOT_WEBHOOK_AUTH_SCHEME: "" });
-    await worker.fetch(await signedRequest(command("111")), e, ctx);
-    await Promise.all(pending);
+    const fetchMock = webhookReturning(200);
+    await run(command("111"), env({ GROKBOT_WEBHOOK_AUTH_HEADER: "X-Sender-Key", GROKBOT_WEBHOOK_AUTH_SCHEME: "" }));
     const headers = (fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].headers as Record<string, string>;
     expect(headers["X-Sender-Key"]).toBe("secret-key");
     expect(headers.Authorization).toBeUndefined();
   });
 
-  it("patches the original message when the webhook fails", async () => {
-    const fetchMock = vi.fn(async (url: string) => new Response("", { status: url.includes("example.test") ? 500 : 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    const { ctx, pending } = makeCtx();
-    await worker.fetch(await signedRequest(command("111")), env(), ctx);
-    await Promise.all(pending);
-    expect(fetchMock).toHaveBeenCalledTimes(2);
-    const [url, init] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
-    expect(url).toBe("https://discord.com/api/v10/webhooks/app-1/tok-abc/messages/@original");
-    expect(init.method).toBe("PATCH");
-    expect(JSON.parse(init.body as string).content).toContain("HTTP 500");
-  });
-
-  it("patches 'Sent to Grug.' after a successful forward", async () => {
-    const fetchMock = vi.fn(async () => new Response("{}", { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    const { ctx, pending } = makeCtx();
-    await worker.fetch(await signedRequest(command("111")), env(), ctx);
-    await Promise.all(pending);
-    const [url, init] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
-    expect(url).toBe("https://discord.com/api/v10/webhooks/app-1/tok-abc/messages/@original");
-    expect(init.method).toBe("PATCH");
-    expect(JSON.parse(init.body as string).content).toBe("Sent to Grug.");
-  });
-
-  it("patches an error when the webhook is unreachable", async () => {
-    const fetchMock = vi.fn(async (url: string) => {
-      if (url.includes("example.test")) throw new Error("boom");
-      return new Response("", { status: 200 });
-    });
-    vi.stubGlobal("fetch", fetchMock);
-    const { ctx, pending } = makeCtx();
-    await worker.fetch(await signedRequest(command("111")), env(), ctx);
-    await Promise.all(pending);
-    const init = (fetchMock.mock.calls[1] as unknown as [string, RequestInit])[1];
-    expect(JSON.parse(init.body as string).content).toContain("could not be reached");
-  });
-
-  it("logs the webhook status but never the key", async () => {
-    const logs: string[] = [];
-    const spy = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => { logs.push(a.join(" ")); });
-    vi.stubGlobal("fetch", vi.fn(async (url: string) => new Response(url.includes("example.test") ? "nope" : "", { status: url.includes("example.test") ? 403 : 200 })));
-    const { ctx, pending } = makeCtx();
-    await worker.fetch(await signedRequest(command("111")), env(), ctx);
-    await Promise.all(pending);
-    spy.mockRestore();
-    const all = logs.join("\n");
-    expect(all).toContain("webhook status=403");
-    expect(all).toContain("nope");
-    expect(all).not.toContain("secret-key");
-  });
-
   it("flattens subcommands into the command path", async () => {
-    const fetchMock = vi.fn(async () => new Response("ok"));
-    vi.stubGlobal("fetch", fetchMock);
-    const { ctx, pending } = makeCtx();
-    const cmd = command("111", {
-      data: { name: "bot", options: [{ name: "issue", type: 1, options: [{ name: "number", type: 4, value: 200 }] }] },
-    });
-    await worker.fetch(await signedRequest(cmd), env(), ctx);
-    await Promise.all(pending);
+    const fetchMock = webhookReturning(200);
+    await run(command("111", { data: { name: "bot", options: [{ name: "issue", type: 1, options: [{ name: "number", type: 4, value: 200 }] }] } }));
     const body = JSON.parse((fetchMock.mock.calls[0] as unknown as [string, RequestInit])[1].body as string);
     expect(body.command).toBe("bot issue");
     expect(body.options).toEqual({ number: 200 });
     expect(body.text).toBe("number: 200");
+  });
+});
+
+describe("webhook failures", () => {
+  it.each([
+    [401, "rejected the key", "GROKBOT_WEBHOOK_KEY"],
+    [403, "rejected the key", "GROKBOT_WEBHOOK_AUTH_SCHEME"],
+    [404, "URL was not found", "GROKBOT_WEBHOOK_URL"],
+    [429, "rate limiting", "HTTP 429"],
+    [502, "server error", "HTTP 502"],
+    [418, "returned HTTP 418", "HTTP 418"],
+  ])("edits the deferred message for HTTP %i", async (status, phrase, mention) => {
+    const fetchMock = webhookReturning(status, '{"message":"Invalid API key"}');
+    await run(command("111"));
+    const edit = lastEdit(fetchMock);
+    expect(edit.url).toBe(ORIGINAL);
+    expect(edit.method).toBe("PATCH");
+    expect(edit.content).toContain(phrase);
+    expect(edit.content).toContain(mention);
+    expect(edit.content).toContain("Invalid API key");
+    expect(edit.content).not.toContain("secret-key");
+  });
+
+  it("mentions wrangler secret put for key and URL problems", () => {
+    expect(describeWebhookFailure(401, "")).toContain("wrangler secret put");
+    expect(describeWebhookFailure(404, "")).toContain("wrangler secret put");
+  });
+
+  it("edits the deferred message when the webhook is unreachable", async () => {
+    const fetchMock = vi.fn(async (url: string) => {
+      if (url.includes("example.test")) throw new Error("connection refused");
+      return new Response("{}");
+    });
+    vi.stubGlobal("fetch", fetchMock);
+    await run(command("111"));
+    expect(lastEdit(fetchMock).content).toContain("Could not reach the webhook (connection refused)");
+  });
+
+  it("logs one line per forward with the status and never the key", async () => {
+    const logs: string[] = [];
+    const spy = vi.spyOn(console, "log").mockImplementation((...a: unknown[]) => { logs.push(a.join(" ")); });
+    webhookReturning(403, "nope");
+    await run(command("111"));
+    spy.mockRestore();
+    expect(logs).toHaveLength(1);
+    expect(logs[0]).toContain("[forward int-1] status=403");
+    expect(logs[0]).toContain("nope");
+    expect(logs.join("\n")).not.toContain("secret-key");
   });
 });

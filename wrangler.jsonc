@@ -5,12 +5,12 @@
   "compatibility_date": "2026-05-01",
   "observability": { "enabled": true },
   "vars": {
-    // Non-secret settings. Override here or in the dashboard.
+    // Optional, non-secret settings. Comma-separated ids; empty means no restriction.
     "ALLOWED_GUILD_IDS": "",
     "ALLOWED_CHANNEL_IDS": "",
     "GROKBOT_WEBHOOK_AUTH_HEADER": "Authorization",
     "GROKBOT_WEBHOOK_AUTH_SCHEME": "Bearer"
   }
-  // Secrets, set with `npx wrangler secret put <NAME>`:
+  // Secrets: set each with `npx wrangler secret put <NAME>` or in the Cloudflare dashboard.
   //   DISCORD_PUBLIC_KEY, ALLOWED_USER_IDS, GROKBOT_WEBHOOK_URL, GROKBOT_WEBHOOK_KEY
 }
