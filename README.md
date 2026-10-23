@@ -22,7 +22,7 @@ The Worker handles all four. It also drops anyone who isn't on your allowlist, s
 5. The routine replies by sending a PATCH to `edit_original_url`, which replaces the "thinking" message. It can send more messages with POST requests to `followup_url`. These URLs carry the interaction token, so no bot token is needed. The token expires 15 minutes after the command.
 6. If the webhook call fails, the Worker edits the "thinking" message to say what went wrong. If it succeeds, Discord keeps showing "thinking" until the bot replies.
 
-The Worker doesn't care about the command's name. It forwards any slash command and puts the name in the payload's `command` field, so you can register `/ask`, `/grug` or several commands against the same Worker.
+The Worker doesn't care about the command's name. It forwards any slash command and puts the name in the payload's `command` field, so you can register `/ask`, `/support` or several commands against the same Worker.
 
 If the bot needs more than 15 minutes, it can post a short "Working on it" reply first. To post after the token expires, give the routine your bot token and have it send to `https://discord.com/api/v10/channels/<channel_id>/messages` with `Authorization: Bot <token>`. That needs the `bot` scope and the Send Messages permission in that channel.
 
@@ -103,7 +103,7 @@ This creates `/ask prompt:<text>`. Options:
 | `DISCORD_APPLICATION_ID` | yes | | Application ID from step 1. |
 | `DISCORD_BOT_TOKEN` | yes | | Bot token from step 1. Used only by this script, never printed. |
 | `DISCORD_GUILD_ID` | no | global | Register in this server only. It appears instantly. Without it, the command is global and can take up to an hour to appear. |
-| `COMMAND_NAME` | no | `ask` | 1 to 32 characters: lowercase `a-z`, `0-9`, `-` or `_`. For example `COMMAND_NAME=grug` gives `/grug`. |
+| `COMMAND_NAME` | no | `ask` | 1 to 32 characters: lowercase `a-z`, `0-9`, `-` or `_`. For example `COMMAND_NAME=support` gives `/support`. |
 | `COMMAND_DESCRIPTION` | no | `Send a request to the bot` | 1 to 100 characters, shown in Discord's command picker. |
 
 Running the script again with the same name updates the command. Run it with another `COMMAND_NAME` to add a second command.
@@ -124,7 +124,7 @@ Type `/ask prompt: hello` in an allowed channel. You should see "thinking" and t
 | `ALLOWED_CHANNEL_IDS` | var | no | any channel | `456789012345678901` | Comma-separated channel ids. |
 | `GROKBOT_WEBHOOK_AUTH_HEADER` | var | no | `Authorization` | `X-Api-Key` | The header that carries the key. |
 | `GROKBOT_WEBHOOK_AUTH_SCHEME` | var | no | `Bearer` | `""` | Text before the key. Set it to `""` to send the key alone. |
-| `DENIED_MESSAGE` | var | no | `Grug only take orders from one human. You not that human. Grug go back to cave now. 🪨` | `Sorry, this bot is private.` | First line of the reply a user not in `ALLOWED_USER_IDS` gets. A second line with their user id and how to allow it is always added. Only they see it. |
+| `DENIED_MESSAGE` | var | no | `You aren't allowed to use this bot.` | `Sorry, this bot is private.` | First line of the reply a user not in `ALLOWED_USER_IDS` gets. A second line with their user id and how to allow it is always added. Only they see it. |
 
 `GROKBOT_WEBHOOK_KEY` is the only secret. Set it with `npx wrangler secret put GROKBOT_WEBHOOK_KEY` or in the dashboard as type **Secret**. Vars are plain Text variables, set in the dashboard or in a `vars` block in `wrangler.jsonc`. None of them are sensitive: the public key is public, user ids aren't private, and the webhook URL is useless without the key. Keeping them as Text means you can read them in the dashboard. Cloudflare doesn't allow a secret and a var with the same name. For local development, copy `.dev.vars.example` to `.dev.vars`.
 
@@ -198,7 +198,7 @@ Messages the Worker can show in Discord, and what to do:
 | `The bot is not configured yet: - DISCORD_PUBLIC_KEY ...` or another setting name | Set the named setting. Open the Worker URL to see which settings are missing. |
 | `ALLOWED_USER_IDS is empty, so nobody is allowed` | Set `ALLOWED_USER_IDS` to your user id. |
 | `GROKBOT_WEBHOOK_URL is not a valid https:// URL` | Paste the full webhook URL, starting with `https://`. |
-| `Grug only take orders from one human...` (or your `DENIED_MESSAGE`), followed by `Your Discord user ID is <id>` | That user isn't in `ALLOWED_USER_IDS`. If it's you, add the id shown (comma-separated). |
+| `You aren't allowed to use this bot.` (or your `DENIED_MESSAGE`), followed by `Your Discord user ID is <id>` | That user isn't in `ALLOWED_USER_IDS`. If it's you, add the id shown (comma-separated). |
 | `This bot isn't allowed in this server.` followed by `The server ID is <id>` | Add the id to `ALLOWED_GUILD_IDS`, or empty it to allow every server. |
 | `This bot isn't allowed in direct messages.` | `ALLOWED_GUILD_IDS` is set. Use the command in an allowed server, or empty `ALLOWED_GUILD_IDS`. |
 | `This bot isn't allowed in this channel.` followed by `The channel ID is <id>` | Add the id to `ALLOWED_CHANNEL_IDS`, or empty it. |

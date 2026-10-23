@@ -212,7 +212,7 @@ export async function verifyDiscordRequest(
  * Fails closed: an empty ALLOWED_USER_IDS allows nobody.
  */
 export const DEFAULT_DENIED_MESSAGE =
-  "Grug only take orders from one human. You not that human. Grug go back to cave now. \u{1FAA8}";
+  "You aren't allowed to use this bot.";
 
 /** A first line, then a small `-#` hint line telling the bot's owner how to allow it. */
 function denial(line: string, hint: string): string {

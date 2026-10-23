@@ -189,7 +189,7 @@ describe("interactions", () => {
     expect(body.type).toBe(4);
     expect(body.data.flags).toBe(64);
     expect(body.data.content).toBe(
-      "Grug only take orders from one human. You not that human. Grug go back to cave now. \u{1FAA8}\n" +
+      "You aren't allowed to use this bot.\n" +
         "-# Your Discord user ID is `999`. If you run this bot, add it to `ALLOWED_USER_IDS`.",
     );
     expect(fetchMock).not.toHaveBeenCalled();
@@ -201,7 +201,7 @@ describe("interactions", () => {
     expect(body.data.flags).toBe(64);
     expect(body.data.content).toBe("Nope.\n-# Your Discord user ID is `999`. If you run this bot, add it to `ALLOWED_USER_IDS`.");
     const blank = await (await run(command("999"), env({ DENIED_MESSAGE: "  " }))).json();
-    expect(blank.data.content).toContain("Grug only take orders from one human.");
+    expect(blank.data.content).toContain("You aren't allowed to use this bot.\n-# ");
   });
 
   it("enforces guild and channel allowlists and names the ids", async () => {
