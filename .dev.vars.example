@@ -1,5 +1,5 @@
 # Copy to .dev.vars for `npm run dev`. Never commit .dev.vars.
-# In production only GROKBOT_WEBHOOK_KEY is a secret. The rest are plain Text variables.
+# In production only GROKBOT_WEBHOOK_KEY and DISCORD_BOT_TOKEN are secrets. The rest are plain Text variables.
 # Required
 DISCORD_PUBLIC_KEY=        # Developer Portal > General Information > Public Key (64 hex characters)
 ALLOWED_USER_IDS=          # comma-separated Discord user ids, e.g. 123456789012345678
@@ -10,4 +10,6 @@ GROKBOT_WEBHOOK_KEY=       # the routine's webhook key (secret)
 # ALLOWED_CHANNEL_IDS=
 # GROKBOT_WEBHOOK_AUTH_HEADER=Authorization
 # GROKBOT_WEBHOOK_AUTH_SCHEME=Bearer
+# DISCORD_BOT_TOKEN=        # secret; lets replies arrive after Discord's 15-minute limit
+# REPLY_TTL_MINUTES=60      # how long reply URLs work, 1 to 10080
 # DENIED_MESSAGE=Sorry, this bot is private.   # first line of the reply to users not in ALLOWED_USER_IDS
