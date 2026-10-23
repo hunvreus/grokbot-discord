@@ -11,8 +11,6 @@ export interface Env {
   ALLOWED_CHANNEL_IDS?: string;
   GROKBOT_WEBHOOK_URL?: string;
   GROKBOT_WEBHOOK_KEY?: string;
-  GROKBOT_WEBHOOK_AUTH_HEADER?: string;
-  GROKBOT_WEBHOOK_AUTH_SCHEME?: string;
   DENIED_MESSAGE?: string;
   DISCORD_BOT_TOKEN?: string;
   REPLY_TTL_MINUTES?: string;
@@ -197,8 +195,6 @@ function statusPage(env: Env): Response {
   const optional: [keyof Env, string][] = [
     ["ALLOWED_GUILD_IDS", "any server"],
     ["ALLOWED_CHANNEL_IDS", "any channel"],
-    ["GROKBOT_WEBHOOK_AUTH_HEADER", "Authorization"],
-    ["GROKBOT_WEBHOOK_AUTH_SCHEME", "Bearer"],
     ["DISCORD_BOT_TOKEN", "replies after 15 minutes fail"],
     ["REPLY_TTL_MINUTES", String(DEFAULT_REPLY_TTL_MINUTES)],
   ];
@@ -327,19 +323,16 @@ function flattenOptions(opts: CommandOption[], out: Record<string, string | numb
   }
 }
 
-/** The only place that knows how the routine webhook expects its key. */
+/** The only place that knows how the routine webhook expects its key: `Authorization: Bearer <key>`. */
 export function webhookAuthHeaders(env: Env): Record<string, string> {
-  const header = env.GROKBOT_WEBHOOK_AUTH_HEADER || "Authorization";
-  const scheme = env.GROKBOT_WEBHOOK_AUTH_SCHEME ?? "Bearer";
-  const key = (env.GROKBOT_WEBHOOK_KEY ?? "").trim();
-  return { [header]: scheme ? `${scheme} ${key}` : key };
+  return { Authorization: `Bearer ${(env.GROKBOT_WEBHOOK_KEY ?? "").trim()}` };
 }
 
 /** Turns a failed webhook response into a message an installer can act on. */
 export function describeWebhookFailure(status: number, body: string): string {
   const snippet = body ? ` Response: ${body.slice(0, 200)}` : "";
   if (status === 401 || status === 403) {
-    return `The webhook rejected the key (HTTP ${status}). Check GROKBOT_WEBHOOK_KEY, GROKBOT_WEBHOOK_AUTH_HEADER and GROKBOT_WEBHOOK_AUTH_SCHEME. ${SET_KEY_HINT}${snippet}`;
+    return `The webhook rejected the key (HTTP ${status}). Check GROKBOT_WEBHOOK_KEY. ${SET_KEY_HINT}${snippet}`;
   }
   if (status === 404) {
     return `The webhook URL was not found (HTTP 404). Check GROKBOT_WEBHOOK_URL. ${SET_VARS_HINT}${snippet}`;

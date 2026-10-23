@@ -8,8 +8,6 @@ GROKBOT_WEBHOOK_KEY=       # the routine's webhook key (secret)
 # Optional
 # ALLOWED_GUILD_IDS=
 # ALLOWED_CHANNEL_IDS=
-# GROKBOT_WEBHOOK_AUTH_HEADER=Authorization
-# GROKBOT_WEBHOOK_AUTH_SCHEME=Bearer
 # DISCORD_BOT_TOKEN=        # secret; lets replies arrive after Discord's 15-minute limit
 # REPLY_TTL_MINUTES=60      # how long reply URLs work, 1 to 10080
 # DENIED_MESSAGE=Sorry, this bot is private.   # first line of the reply to users not in ALLOWED_USER_IDS
