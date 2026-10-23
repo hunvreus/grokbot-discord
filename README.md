@@ -124,6 +124,7 @@ Type `/ask prompt: hello` in an allowed channel. You should see "thinking" and t
 | `ALLOWED_CHANNEL_IDS` | var | no | any channel | `456789012345678901` | Comma-separated channel ids. |
 | `GROKBOT_WEBHOOK_AUTH_HEADER` | var | no | `Authorization` | `X-Api-Key` | The header that carries the key. |
 | `GROKBOT_WEBHOOK_AUTH_SCHEME` | var | no | `Bearer` | `""` | Text before the key. Set it to `""` to send the key alone. |
+| `DENIED_MESSAGE` | var | no | `Grug only take orders from one human. You not that human. Grug go back to cave now. 🪨` | `Sorry, this bot is private.` | First line of the reply a user not in `ALLOWED_USER_IDS` gets. A second line with their user id and how to allow it is always added. Only they see it. |
 
 `GROKBOT_WEBHOOK_KEY` is the only secret. Set it with `npx wrangler secret put GROKBOT_WEBHOOK_KEY` or in the dashboard as type **Secret**. Vars are plain Text variables, set in the dashboard or in a `vars` block in `wrangler.jsonc`. None of them are sensitive: the public key is public, user ids aren't private, and the webhook URL is useless without the key. Keeping them as Text means you can read them in the dashboard. Cloudflare doesn't allow a secret and a var with the same name. For local development, copy `.dev.vars.example` to `.dev.vars`.
 
@@ -197,10 +198,10 @@ Messages the Worker can show in Discord, and what to do:
 | `The bot is not configured yet: - DISCORD_PUBLIC_KEY ...` or another setting name | Set the named setting. Open the Worker URL to see which settings are missing. |
 | `ALLOWED_USER_IDS is empty, so nobody is allowed` | Set `ALLOWED_USER_IDS` to your user id. |
 | `GROKBOT_WEBHOOK_URL is not a valid https:// URL` | Paste the full webhook URL, starting with `https://`. |
-| `You aren't allowed to use this bot. To allow it, add user id <id> to ALLOWED_USER_IDS.` | Add that id to `ALLOWED_USER_IDS` (comma-separated). |
-| `This bot isn't allowed in this server. To allow it, add server id <id> to ALLOWED_GUILD_IDS.` | Add the id to `ALLOWED_GUILD_IDS`, or empty it to allow every server. |
-| `This bot isn't allowed in direct messages because ALLOWED_GUILD_IDS is set.` | Use the command in an allowed server, or empty `ALLOWED_GUILD_IDS`. |
-| `This bot isn't allowed in this channel. To allow it, add channel id <id> to ALLOWED_CHANNEL_IDS.` | Add the id to `ALLOWED_CHANNEL_IDS`, or empty it. |
+| `Grug only take orders from one human...` (or your `DENIED_MESSAGE`), followed by `Your Discord user ID is <id>` | That user isn't in `ALLOWED_USER_IDS`. If it's you, add the id shown (comma-separated). |
+| `This bot isn't allowed in this server.` followed by `The server ID is <id>` | Add the id to `ALLOWED_GUILD_IDS`, or empty it to allow every server. |
+| `This bot isn't allowed in direct messages.` | `ALLOWED_GUILD_IDS` is set. Use the command in an allowed server, or empty `ALLOWED_GUILD_IDS`. |
+| `This bot isn't allowed in this channel.` followed by `The channel ID is <id>` | Add the id to `ALLOWED_CHANNEL_IDS`, or empty it. |
 | `This bot only handles slash commands` or `... is not a slash command` | Only chat slash commands are supported. Buttons, modals and context-menu commands are not. |
 | `/<command> needs a prompt.` | The command had no options. Register it with `npm run register`, which adds a required `prompt`. |
 | `Could not reach the bot. The webhook rejected the key (HTTP 401)` or `(HTTP 403)` | `GROKBOT_WEBHOOK_KEY` is wrong, or the header or scheme don't match what the webhook expects. Copy the key from the routine again and paste it yourself with `npx wrangler secret put GROKBOT_WEBHOOK_KEY` or in the dashboard. |

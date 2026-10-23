@@ -188,16 +188,28 @@ describe("interactions", () => {
     const body = await (await run(command("999"))).json();
     expect(body.type).toBe(4);
     expect(body.data.flags).toBe(64);
-    expect(body.data.content).toContain("add user id 999 to ALLOWED_USER_IDS");
+    expect(body.data.content).toBe(
+      "Grug only take orders from one human. You not that human. Grug go back to cave now. \u{1FAA8}\n" +
+        "-# Your Discord user ID is `999`. If you run this bot, add it to `ALLOWED_USER_IDS`.",
+    );
     expect(fetchMock).not.toHaveBeenCalled();
+  });
+
+  it("uses DENIED_MESSAGE as the first line and still appends the id hint", async () => {
+    vi.stubGlobal("fetch", vi.fn());
+    const body = await (await run(command("999"), env({ DENIED_MESSAGE: "Nope." }))).json();
+    expect(body.data.flags).toBe(64);
+    expect(body.data.content).toBe("Nope.\n-# Your Discord user ID is `999`. If you run this bot, add it to `ALLOWED_USER_IDS`.");
+    const blank = await (await run(command("999"), env({ DENIED_MESSAGE: "  " }))).json();
+    expect(blank.data.content).toContain("Grug only take orders from one human.");
   });
 
   it("enforces guild and channel allowlists and names the ids", async () => {
     vi.stubGlobal("fetch", vi.fn());
     const r1 = await (await run(command("111"), env({ ALLOWED_GUILD_IDS: "g-2" }))).json();
-    expect(r1.data.content).toContain("add server id g-1 to ALLOWED_GUILD_IDS");
+    expect(r1.data.content).toContain("-# The server ID is `g-1`. To allow it, add it to `ALLOWED_GUILD_IDS`.");
     const r2 = await (await run(command("111"), env({ ALLOWED_CHANNEL_IDS: "c-9" }))).json();
-    expect(r2.data.content).toContain("add channel id c-1 to ALLOWED_CHANNEL_IDS");
+    expect(r2.data.content).toContain("-# The channel ID is `c-1`. To allow it, add it to `ALLOWED_CHANNEL_IDS`.");
     const r3 = await (await run(command("111", { guild_id: undefined }), env({ ALLOWED_GUILD_IDS: "g-2" }))).json();
     expect(r3.data.content).toContain("direct messages");
   });

@@ -12,6 +12,7 @@ export interface Env {
   GROKBOT_WEBHOOK_KEY?: string;
   GROKBOT_WEBHOOK_AUTH_HEADER?: string;
   GROKBOT_WEBHOOK_AUTH_SCHEME?: string;
+  DENIED_MESSAGE?: string;
 }
 
 export const README_URL = "https://github.com/hunvreus/grokbot-discord#readme";
@@ -210,21 +211,31 @@ export async function verifyDiscordRequest(
  * Returns why the user, server or channel isn't allowed, or null if it is.
  * Fails closed: an empty ALLOWED_USER_IDS allows nobody.
  */
+export const DEFAULT_DENIED_MESSAGE =
+  "Grug only take orders from one human. You not that human. Grug go back to cave now. \u{1FAA8}";
+
+/** A first line, then a small `-#` hint line telling the bot's owner how to allow it. */
+function denial(line: string, hint: string): string {
+  return `${line}\n-# ${hint}`;
+}
+
 export function rejectionMessage(interaction: Interaction, env: Env): string | null {
   const userId = (interaction.member?.user ?? interaction.user)?.id ?? "unknown";
   if (!parseList(env.ALLOWED_USER_IDS).includes(userId)) {
-    return `You aren't allowed to use this bot. To allow it, add user id ${userId} to ALLOWED_USER_IDS.`;
+    const line = (env.DENIED_MESSAGE ?? "").trim() || DEFAULT_DENIED_MESSAGE;
+    return denial(line, `Your Discord user ID is \`${userId}\`. If you run this bot, add it to \`ALLOWED_USER_IDS\`.`);
   }
+  // Only allowed users get past this point, so these messages speak to the owner.
   const guilds = parseList(env.ALLOWED_GUILD_IDS);
   if (guilds.length > 0 && !guilds.includes(interaction.guild_id ?? "")) {
     return interaction.guild_id
-      ? `This bot isn't allowed in this server. To allow it, add server id ${interaction.guild_id} to ALLOWED_GUILD_IDS.`
-      : "This bot isn't allowed in direct messages because ALLOWED_GUILD_IDS is set. Use it in an allowed server.";
+      ? denial("This bot isn't allowed in this server.", `The server ID is \`${interaction.guild_id}\`. To allow it, add it to \`ALLOWED_GUILD_IDS\`.`)
+      : denial("This bot isn't allowed in direct messages.", "`ALLOWED_GUILD_IDS` is set. Use it in an allowed server, or empty `ALLOWED_GUILD_IDS`.");
   }
   const channels = parseList(env.ALLOWED_CHANNEL_IDS);
   const channelId = interaction.channel_id ?? interaction.channel?.id ?? "unknown";
   if (channels.length > 0 && !channels.includes(channelId)) {
-    return `This bot isn't allowed in this channel. To allow it, add channel id ${channelId} to ALLOWED_CHANNEL_IDS.`;
+    return denial("This bot isn't allowed in this channel.", `The channel ID is \`${channelId}\`. To allow it, add it to \`ALLOWED_CHANNEL_IDS\`.`);
   }
   return null;
 }

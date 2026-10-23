@@ -10,3 +10,4 @@ GROKBOT_WEBHOOK_KEY=       # the routine's webhook key (secret)
 # ALLOWED_CHANNEL_IDS=
 # GROKBOT_WEBHOOK_AUTH_HEADER=Authorization
 # GROKBOT_WEBHOOK_AUTH_SCHEME=Bearer
+# DENIED_MESSAGE=Sorry, this bot is private.   # first line of the reply to users not in ALLOWED_USER_IDS
