@@ -1,9 +1,10 @@
 # Copy to .dev.vars for `npm run dev`. Never commit .dev.vars.
+# In production only GROKBOT_WEBHOOK_KEY is a secret. The rest are plain Text variables.
 # Required
 DISCORD_PUBLIC_KEY=        # Developer Portal > General Information > Public Key (64 hex characters)
 ALLOWED_USER_IDS=          # comma-separated Discord user ids, e.g. 123456789012345678
 GROKBOT_WEBHOOK_URL=       # the routine's webhook URL
-GROKBOT_WEBHOOK_KEY=       # the routine's webhook key
+GROKBOT_WEBHOOK_KEY=       # the routine's webhook key (secret)
 # Optional
 # ALLOWED_GUILD_IDS=
 # ALLOWED_CHANNEL_IDS=

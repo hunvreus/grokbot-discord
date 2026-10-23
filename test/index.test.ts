@@ -269,9 +269,10 @@ describe("webhook failures", () => {
     expect(edit.content).not.toContain("secret-key");
   });
 
-  it("mentions wrangler secret put for key and URL problems", () => {
-    expect(describeWebhookFailure(401, "")).toContain("wrangler secret put");
-    expect(describeWebhookFailure(404, "")).toContain("wrangler secret put");
+  it("points key problems at the secret and URL problems at the variables", () => {
+    expect(describeWebhookFailure(401, "")).toContain("wrangler secret put GROKBOT_WEBHOOK_KEY");
+    expect(describeWebhookFailure(404, "")).toContain("Text variables");
+    expect(describeWebhookFailure(404, "")).not.toContain("wrangler secret put");
   });
 
   it("edits the deferred message when the webhook is unreachable", async () => {

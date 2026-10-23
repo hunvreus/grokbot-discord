@@ -64,18 +64,25 @@ npx wrangler deploy
 
 Wrangler prints the Worker URL, for example `https://grokbot-discord.<your-subdomain>.workers.dev`.
 
-Set the four secrets. Each command prompts for the value, so nothing ends up in your shell history:
+Configure the Worker. Only the webhook key is a secret. Set it with Wrangler, which prompts for the value so nothing ends up in your shell history:
 
 ```sh
-npx wrangler secret put DISCORD_PUBLIC_KEY    # Public Key from step 1
-npx wrangler secret put ALLOWED_USER_IDS      # your user id from step 2, comma-separated for several
-npx wrangler secret put GROKBOT_WEBHOOK_URL   # Webhook URL from step 3
 npx wrangler secret put GROKBOT_WEBHOOK_KEY   # Webhook key from step 3
 ```
 
-You can also set them in the Cloudflare dashboard under **Workers & Pages > grokbot-discord > Settings > Variables and Secrets**. Paste secrets yourself. Copying them through scripts, chat tools or AI agents can mangle or mask the value, and the Worker will then get a key the webhook rejects.
+Set the other three as plain variables in the Cloudflare dashboard under **Workers & Pages > grokbot-discord > Settings > Variables and Secrets**. Click **Add**, pick type **Text**, and save:
 
-To limit the bot to some servers or channels, set `ALLOWED_GUILD_IDS` or `ALLOWED_CHANNEL_IDS` in `wrangler.jsonc` under `vars` and run `npx wrangler deploy` again.
+| Name | Value |
+| --- | --- |
+| `DISCORD_PUBLIC_KEY` | Public Key from step 1 |
+| `ALLOWED_USER_IDS` | your user id from step 2, comma-separated for several |
+| `GROKBOT_WEBHOOK_URL` | Webhook URL from step 3 |
+
+You can also set the key in the dashboard as type **Secret**. Paste it yourself. Copying it through scripts, chat tools or AI agents can mangle or mask the value, and the Worker will then get a key the webhook rejects.
+
+To limit the bot to some servers or channels, add `ALLOWED_GUILD_IDS` or `ALLOWED_CHANNEL_IDS` the same way, as Text variables.
+
+`wrangler.jsonc` sets `keep_vars: true`, so `npx wrangler deploy` keeps the variables you set in the dashboard. Secrets are always kept. If you prefer config in code, put the plain variables in a `vars` block in `wrangler.jsonc` instead. Those values replace the dashboard ones on every deploy.
 
 Open the Worker URL in a browser. It shows a status page listing each required setting as `ok` or what is wrong with it. It never shows values.
 
@@ -109,16 +116,16 @@ Type `/ask prompt: hello` in an allowed channel. You should see "thinking" and t
 
 | Name | Type | Required | Default | Example | Meaning |
 | --- | --- | --- | --- | --- | --- |
-| `DISCORD_PUBLIC_KEY` | secret | yes | | 64 hex characters | The app's Ed25519 public key. |
-| `ALLOWED_USER_IDS` | secret | yes | | `123456789012345678,234567890123456789` | Discord user ids allowed to use the bot. Empty means nobody. |
-| `GROKBOT_WEBHOOK_URL` | secret | yes | | `https://api2.cursor.sh/automations/webhook/<id>` | The routine's webhook URL. Must be `https://`. |
+| `DISCORD_PUBLIC_KEY` | var | yes | | 64 hex characters | The app's Ed25519 public key. |
+| `ALLOWED_USER_IDS` | var | yes | | `123456789012345678,234567890123456789` | Discord user ids allowed to use the bot. Empty means nobody. |
+| `GROKBOT_WEBHOOK_URL` | var | yes | | `https://api2.cursor.sh/automations/webhook/<id>` | The routine's webhook URL. Must be `https://`. |
 | `GROKBOT_WEBHOOK_KEY` | secret | yes | | | The routine's webhook key. |
 | `ALLOWED_GUILD_IDS` | var | no | any server | `345678901234567890` | Comma-separated server ids. |
 | `ALLOWED_CHANNEL_IDS` | var | no | any channel | `456789012345678901` | Comma-separated channel ids. |
 | `GROKBOT_WEBHOOK_AUTH_HEADER` | var | no | `Authorization` | `X-Api-Key` | The header that carries the key. |
 | `GROKBOT_WEBHOOK_AUTH_SCHEME` | var | no | `Bearer` | `""` | Text before the key. Set it to `""` to send the key alone. |
 
-Secrets are set with `npx wrangler secret put <NAME>` or in the dashboard. Vars live in `wrangler.jsonc`. Cloudflare doesn't allow a secret and a var with the same name. For local development, copy `.dev.vars.example` to `.dev.vars`.
+`GROKBOT_WEBHOOK_KEY` is the only secret. Set it with `npx wrangler secret put GROKBOT_WEBHOOK_KEY` or in the dashboard as type **Secret**. Vars are plain Text variables, set in the dashboard or in a `vars` block in `wrangler.jsonc`. None of them are sensitive: the public key is public, user ids aren't private, and the webhook URL is useless without the key. Keeping them as Text means you can read them in the dashboard. Cloudflare doesn't allow a secret and a var with the same name. For local development, copy `.dev.vars.example` to `.dev.vars`.
 
 ## Payload format
 

@@ -17,9 +17,11 @@ export interface Env {
 export const README_URL = "https://github.com/hunvreus/grokbot-discord#readme";
 const TROUBLESHOOTING_URL = "https://github.com/hunvreus/grokbot-discord#troubleshooting";
 const DISCORD_API = "https://discord.com/api/v10";
-const SET_SECRETS_HINT =
-  "Set secrets in the Cloudflare dashboard (Worker > Settings > Variables and Secrets) or with `npx wrangler secret put <NAME>`, " +
-  "and paste the value yourself: automated tools can mangle secrets.";
+const SET_KEY_HINT =
+  "Set GROKBOT_WEBHOOK_KEY as a secret in the Cloudflare dashboard (Worker > Settings > Variables and Secrets) or with " +
+  "`npx wrangler secret put GROKBOT_WEBHOOK_KEY`, and paste the value yourself: automated tools can mangle secrets.";
+const SET_VARS_HINT =
+  "Set the other settings as Text variables in the Cloudflare dashboard (Worker > Settings > Variables and Secrets).";
 
 // Interaction types
 const PING = 1;
@@ -115,7 +117,7 @@ export default {
     if (problems.length > 0) {
       const lines = problems.map((p) => `- ${p.name} ${p.problem}`).join("\n");
       console.log(`[config] ${problems.map((p) => p.name).join(", ")}`);
-      return ephemeral(`The bot is not configured yet:\n${lines}\nSee ${README_URL}#configuration. ${SET_SECRETS_HINT}`);
+      return ephemeral(`The bot is not configured yet:\n${lines}\nSee ${README_URL}#configuration. ${SET_VARS_HINT} ${SET_KEY_HINT}`);
     }
 
     const rejection = rejectionMessage(interaction, env);
@@ -278,10 +280,10 @@ export function webhookAuthHeaders(env: Env): Record<string, string> {
 export function describeWebhookFailure(status: number, body: string): string {
   const snippet = body ? ` Response: ${body.slice(0, 200)}` : "";
   if (status === 401 || status === 403) {
-    return `The webhook rejected the key (HTTP ${status}). Check GROKBOT_WEBHOOK_KEY, GROKBOT_WEBHOOK_AUTH_HEADER and GROKBOT_WEBHOOK_AUTH_SCHEME. ${SET_SECRETS_HINT}${snippet}`;
+    return `The webhook rejected the key (HTTP ${status}). Check GROKBOT_WEBHOOK_KEY, GROKBOT_WEBHOOK_AUTH_HEADER and GROKBOT_WEBHOOK_AUTH_SCHEME. ${SET_KEY_HINT}${snippet}`;
   }
   if (status === 404) {
-    return `The webhook URL was not found (HTTP 404). Check GROKBOT_WEBHOOK_URL. ${SET_SECRETS_HINT}${snippet}`;
+    return `The webhook URL was not found (HTTP 404). Check GROKBOT_WEBHOOK_URL. ${SET_VARS_HINT}${snippet}`;
   }
   if (status === 429) return `The webhook is rate limiting requests (HTTP 429). Wait a minute and try again.${snippet}`;
   if (status >= 500) return `The webhook had a server error (HTTP ${status}). Try again later.${snippet}`;
